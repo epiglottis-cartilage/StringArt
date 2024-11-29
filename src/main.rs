@@ -1,37 +1,37 @@
-use std::fs::File;
-use std::io::Read;
-use std::time::Instant;
+mod coord;
+use coord::Coord;
 
-const PINS: usize = 288; // strange number for no reason
+/// strange number for no reason. Change if you need it.
+const PINS: usize = 288;
+/// Range: [0,1]
+const LINE_WEIGHT: f32 = 20.0 / 256.0;
+/// Distance between two pins we choose.
+/// Make it smaller if you find a black ring around the center.
 const MIN_DISTANCE: usize = 20;
+/// How many lines we should calculate.
 const MAX_LINES: usize = 4000;
-const LINE_WEIGHT: f64 = 20.0 / 255.0;
-const IMG_SIZE: usize = 500; // this is independent with file you provide.
-const FILE_PATH: &str = "not-human.jpg";
-
-struct Coord {
-    x: f64,
-    y: f64,
-}
+/// How long should we omit a pin after it is used.
+const TABU_SIZE: usize = 10;
+/// This is independent with file you provide.
+/// Higher value means more accurate but slower.
+const IMG_SIZE: usize = 600;
+/// I don't what it is :)
+const FILE_PATH: &str = "./pic/pp.png";
 
 fn main() {
-    let start_time = Instant::now();
     println!("Loading file...");
-    let source_image = image_to_pixel_array(File::open(FILE_PATH).expect("Failed to open file"));
-    save_temp_file(&source_image);
+    let source_image =
+        image_to_pixel_array(std::fs::File::open(FILE_PATH).expect("Failed to open file"));
     println!("Preparing lines...");
     let pin_coords = calculate_pin_coords();
-    let (line_cache_x, line_cache_y) = precalculate_all_potential_lines(&pin_coords);
+    let line_cache = precalculate_all_potential_lines(&pin_coords);
     println!("Drawing lines...");
-    let results = calculate_lines(&source_image, &line_cache_y, &line_cache_x);
-
-    let end_time = Instant::now();
-    let duration = end_time - start_time;
-    println!("Done. Taken {}s.", duration.as_secs_f64());
+    let results = calculate_lines(&source_image, &line_cache);
 
     println!("\n{:?}", results);
 }
-fn save_temp_file(buffer: &[f64]) {
+
+fn save_temp_file(buffer: &[f32]) {
     use image::{ImageBuffer, Luma};
 
     let mut image_buffer = ImageBuffer::new(IMG_SIZE as _, IMG_SIZE as _);
@@ -44,7 +44,8 @@ fn save_temp_file(buffer: &[f64]) {
     image_buffer.save("temp.png").unwrap();
     // std::thread::sleep(std::time::Duration::from_micros(100));
 }
-fn image_to_pixel_array(mut file: File) -> Vec<f64> {
+fn image_to_pixel_array(mut file: std::fs::File) -> Vec<f32> {
+    use std::io::Read;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
 
@@ -58,136 +59,124 @@ fn image_to_pixel_array(mut file: File) -> Vec<f64> {
         image::imageops::FilterType::Lanczos3,
     );
     image
-        .to_luma_alpha32f()
+        .to_rgba32f()
         .pixels()
         .map(|pixel| {
-            let [luma, a] = pixel.0;
-            (1.0 - (1.0 - luma) * a) as _
+            let [r, g, b, a] = pixel.0;
+            let (r, g, b) = (
+                r * a + r * (1.0 - a),
+                g * a + g * (1.0 - a),
+                b * a + b * (1.0 - a),
+            );
+            let luma = r * 0.3 + g * 0.5 + b * 0.2;
+            luma.min(0.9)
         })
         .collect()
 }
-
 fn calculate_pin_coords() -> Vec<Coord> {
     let mut pin_coords = Vec::new();
-    let center = IMG_SIZE as f64 / 2.0;
-    let radius = (IMG_SIZE / 2) as f64 - 1.0;
+    let center = IMG_SIZE as f32 / 2.0;
+    let radius = (IMG_SIZE / 2) as f32 - 1.0;
 
     for i in 0..PINS {
-        let angle = 2.0 * std::f64::consts::PI * i as f64 / PINS as f64;
+        let angle = 2.0 * std::f32::consts::PI * i as f32 / PINS as f32;
         pin_coords.push(Coord {
-            x: (center + radius * angle.cos()).floor(),
-            y: (center + radius * angle.sin()).floor(),
+            x: center + radius * angle.cos(),
+            y: center + radius * angle.sin(),
         });
     }
     pin_coords
 }
-
-fn precalculate_all_potential_lines(pin_coords: &Vec<Coord>) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
-    let mut line_cache_x = vec![vec![]; PINS * PINS];
-    let mut line_cache_y = vec![vec![]; PINS * PINS];
+fn precalculate_all_potential_lines(pin_coords: &[Coord]) -> Vec<Vec<Vec<Coord>>> {
+    let mut line_cache = vec![vec![vec![]; PINS]; PINS];
 
     for i in 0..PINS {
-        for j in i + MIN_DISTANCE..PINS {
-            let x0 = pin_coords[i].x;
-            let y0 = pin_coords[i].y;
-            let x1 = pin_coords[j].x;
-            let y1 = pin_coords[j].y;
-
-            let d = ((x1 - x0).powi(2) + (y1 - y0).powi(2)).sqrt();
-            let xs = linspace(x0, x1, d as usize);
-            let ys = linspace(y0, y1, d as usize);
-
-            line_cache_x[j * PINS + i] = xs;
-            line_cache_y[j * PINS + i] = ys;
+        for offset in MIN_DISTANCE..PINS - i {
+            let start = pin_coords[i];
+            let end = pin_coords[(i + offset) % PINS];
+            line_cache[i][offset] = lines_pace(start, end);
         }
     }
 
-    (line_cache_x, line_cache_y)
+    line_cache
 }
 
-fn linspace(start: f64, end: f64, n: usize) -> Vec<f64> {
-    let step = (end - start) / (n as f64 - 1.0);
-    (0..n).map(|i| (start + step * i as f64).ceil()).collect()
+fn lines_pace(start: Coord, end: Coord) -> Vec<Coord> {
+    let n = start.distance(end) as usize;
+    let step = Coord {
+        x: (end.x - start.x) / (n as f32 - 1.0),
+        y: (end.y - start.y) / (n as f32 - 1.0),
+    };
+    (0..n).map(|i| (start + step * i as f32).round()).collect()
 }
 
-fn calculate_lines(
-    source_image: &Vec<f64>,
-    line_cache_y: &Vec<Vec<f64>>,
-    line_cache_x: &Vec<Vec<f64>>,
-) -> Vec<usize> {
+fn calculate_lines(source_image: &Vec<f32>, line_cache: &Vec<Vec<Vec<Coord>>>) -> Vec<usize> {
     let mut error = source_image
         .iter()
         .copied()
         .map(|pixel| (1.0 - pixel))
         .collect::<Vec<_>>();
     let mut line_sequence = Vec::with_capacity(MAX_LINES);
-    let mut last_pins = std::collections::VecDeque::with_capacity(50);
+    let mut recent_pins = std::collections::VecDeque::with_capacity(TABU_SIZE + 1);
 
-    let mut index = 0;
+    fn err_alone_line(err: &Vec<f32>, line: &Vec<Coord>) -> f32 {
+        line.iter()
+            .map(|point| {
+                let v = (point.y * IMG_SIZE as f32) + point.x;
+                err[v as usize]
+            })
+            .sum()
+    }
+
     let mut current_pin = 0;
+    line_sequence.push(0);
+
     for i in 0..MAX_LINES {
         if i & 511 == 0 {
-            save_temp_file(&error);
             println!("{i}/{MAX_LINES}");
+            save_temp_file(&error);
         }
-        let mut best_pin = 0;
-        let mut max_err = std::f64::MIN;
-
-        for offset in MIN_DISTANCE..PINS - MIN_DISTANCE {
-            let pin = (current_pin + offset) % PINS;
-            if last_pins.contains(&pin) {
-                continue;
-            } else {
-                let inner_index = if pin > current_pin {
-                    pin * PINS + current_pin
-                } else {
-                    current_pin * PINS + pin
-                };
-
-                let line_err = get_line_err(
-                    &error,
-                    &line_cache_y[inner_index],
-                    &line_cache_x[inner_index],
-                );
-                if line_err > max_err {
-                    max_err = line_err;
-                    best_pin = pin;
-                    index = inner_index;
+        let (_, next_ping, line) = (MIN_DISTANCE..PINS - MIN_DISTANCE)
+            .filter_map(|offset| {
+                let next_pin = (current_pin + offset) % PINS;
+                if recent_pins.contains(&next_pin) {
+                    return None;
                 }
-            }
+
+                let (start, end) = if current_pin < next_pin {
+                    (current_pin, next_pin)
+                } else {
+                    (next_pin, current_pin)
+                };
+                let offset = end - start;
+
+                Some((
+                    err_alone_line(&error, &line_cache[start][offset]),
+                    next_pin,
+                    &line_cache[start][offset],
+                ))
+            })
+            .max_by(|(err1, _, _), (err2, _, _)| err1.total_cmp(err2))
+            .unwrap();
+
+        recent_pins.push_front(next_ping);
+        if recent_pins.len() > TABU_SIZE {
+            recent_pins.pop_back();
         }
+        line_sequence.push(next_ping);
+        current_pin = next_ping;
 
-        line_sequence.push(best_pin);
-
-        let coords1 = &line_cache_y[index];
-        let coords2 = &line_cache_x[index];
-        for i in 0..coords1.len() {
-            let v = (coords1[i] * IMG_SIZE as f64) + coords2[i];
+        for point in line {
+            let v = (point.y * IMG_SIZE as f32) + point.x;
             error[v as usize] -= LINE_WEIGHT;
         }
-
-        last_pins.push_back(best_pin);
-        if last_pins.len() > 30 {
-            last_pins.pop_front();
-        }
-        current_pin = best_pin;
     }
-    let error = source_image
+    let string_image = source_image
         .iter()
         .copied()
         .zip(error.iter().copied())
-        .map(|(s, c)| s + c)
+        .map(|(s, e)| s + e)
         .collect::<Vec<_>>();
-    save_temp_file(&error);
+    save_temp_file(&string_image);
     line_sequence
-}
-
-fn get_line_err(err: &Vec<f64>, coords_y: &Vec<f64>, coords_x: &Vec<f64>) -> f64 {
-    let mut sum = 0.0;
-
-    for i in 0..coords_y.len() {
-        let v = (coords_y[i] * IMG_SIZE as f64) + coords_x[i];
-        sum += err[v as usize];
-    }
-    sum
 }
