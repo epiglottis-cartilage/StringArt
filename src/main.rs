@@ -59,17 +59,12 @@ fn image_to_pixel_array(mut file: std::fs::File) -> Vec<f32> {
         image::imageops::FilterType::Lanczos3,
     );
     image
-        .to_rgba32f()
+        .to_luma_alpha32f()
         .pixels()
         .map(|pixel| {
-            let [r, g, b, a] = pixel.0;
-            let (r, g, b) = (
-                r * a + r * (1.0 - a),
-                g * a + g * (1.0 - a),
-                b * a + b * (1.0 - a),
-            );
-            let luma = r * 0.3 + g * 0.5 + b * 0.2;
-            luma.min(0.9)
+            let [luma, a] = pixel.0;
+            // Make transparent pixels gray.
+            luma * a + (1.0 - a) * 0.5
         })
         .collect()
 }
