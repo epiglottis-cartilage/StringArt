@@ -1,7 +1,5 @@
 mod canvas;
 mod coord;
-use std::io::Write;
-
 use canvas::Canvas;
 use coord::Coord;
 

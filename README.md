@@ -8,7 +8,7 @@ It is necessary to choose a picture without strong contrast (or only with simple
 
 ## Usage
 ```sh
-./StringArt.exs ./Path/to/Your/picture.png > result.txt
+./StringArt.exe ./Path/to/Your/picture.png > result.txt
 ```
 
 ## TODO
