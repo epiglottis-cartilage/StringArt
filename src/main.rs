@@ -1,5 +1,7 @@
 mod canvas;
 mod coord;
+use std::io::Write;
+
 use canvas::Canvas;
 use coord::Coord;
 
@@ -17,31 +19,31 @@ const TABU_SIZE: usize = 10;
 /// This is independent with file you provide.
 /// Higher value means more accurate but slower.
 const IMG_SIZE: usize = 800;
-/// I don't what it is :)
-const FILE_PATH: &str = "./pic/not-human.jpg";
 
 fn main() {
-    println!("Loading file...");
-    let raw_image = load_image(std::fs::File::open(FILE_PATH).expect("Failed to open file"));
-    println!("Preparing lines...");
+    let file = std::env::args().skip(1).next().expect("Pls provide a file");
+    eprintln!("Loading file...");
+    let raw_image = load_image(std::fs::File::open(file).expect("Cannot open the file"));
+    eprintln!("Preparing lines...");
     let pin_coords = calculate_pin_coords(IMG_SIZE);
     let line_cache = precalculate_all_potential_lines(&pin_coords);
-    println!("Drawing lines...");
+    eprintln!("Drawing lines...");
     let line_sequence =
         calculate_lines(&Canvas::from_image(&raw_image, IMG_SIZE as _), &line_cache);
-    println!("\n{:?}", line_sequence);
 
     let size = raw_image.width().min(raw_image.height());
     let mut final_image = Canvas::from_image(&raw_image, size);
     final_image.0.pixels_mut().for_each(|p| p[0] = 1.0);
     draw_lines(&mut final_image, &line_sequence);
     final_image.save_to_file("temp.png").unwrap();
+    println!("{:?}", line_sequence);
 }
+
 fn load_image(mut file: std::fs::File) -> image::DynamicImage {
     use std::io::Read;
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
-    image::load_from_memory(&buffer).expect("Failed to load image")
+    image::load_from_memory(&buffer).expect("Not a valid image file")
 }
 
 fn calculate_pin_coords(img_size: usize) -> Vec<Coord> {
@@ -88,7 +90,7 @@ fn calculate_lines(source_image: &Canvas, line_cache: &Vec<Vec<Vec<Coord>>>) -> 
 
     for i in 0..MAX_LINES {
         if i & 511 == 0 {
-            println!("{i}/{MAX_LINES}");
+            eprintln!("{i}/{MAX_LINES}");
             error.save_to_file("temp.png").unwrap();
         }
         let (_, next_ping, line) = (MIN_DISTANCE..PINS - MIN_DISTANCE)
