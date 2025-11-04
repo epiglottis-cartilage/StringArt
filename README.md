@@ -8,11 +8,11 @@ It is necessary to choose a picture without strong contrast (or only with simple
 
 ## Usage
 ```sh
-./StringArt.exe ./Path/to/Your/picture.png > result.txt
+cargo run -- --help
 ```
 
 ## TODO
 
-- [] add a CI
+- [X] add a CI
 
 ![](./example.gif)
