@@ -1,6 +1,6 @@
 [package]
 name = "StringArt"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 
 authors = ["epiglottis <epiglottis.cartilage@gmail.com>", "halfmonty"]
@@ -9,3 +9,5 @@ license = "MIT"
 [dependencies]
 image = "*"
 clap = { version = "*", features = ["derive"] }
+glam = "*"
+rayon = "*"

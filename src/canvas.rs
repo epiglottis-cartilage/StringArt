@@ -1,64 +1,51 @@
+use glam::Vec2;
 use image::GenericImageView;
 
-use crate::coord::Coord;
-
-pub type GrayImage = image::ImageBuffer<image::Luma<u16>, Vec<u16>>;
 #[derive(Debug, Clone)]
-pub struct Canvas(pub image::ImageBuffer<image::Luma<f32>, Vec<f32>>);
+pub struct Canvas {
+    buf: image::ImageBuffer<image::Luma<f32>, Vec<f32>>,
+    ori_size: u32,
+}
+impl Into<image::DynamicImage> for Canvas {
+    fn into(self) -> image::DynamicImage {
+        image::DynamicImage::from(self.buf.clone())
+    }
+}
 impl Canvas {
-    pub fn invert(&mut self) {
-        for pixel in self.0.pixels_mut() {
-            pixel.0[0] = 1.0 - pixel.0[0];
+    pub fn new(img_size: u32, fill: f32) -> Self {
+        let img_buf = image::ImageBuffer::from_fn(img_size, img_size, |_, _| image::Luma([fill]));
+        Self {
+            buf: img_buf,
+            ori_size: img_size,
         }
     }
-    pub fn save_to_file<P: AsRef<std::path::Path>>(
-        &self,
-        path: P,
-    ) -> image::error::ImageResult<()> {
-        self.to_image().save(path)
-    }
-
-    pub fn from_image(image: &image::DynamicImage, img_size: u32) -> Canvas {
+    pub fn from(image: &image::DynamicImage, img_size: u32) -> Self {
         let (w, h) = image.dimensions();
         let size = w.min(h);
-        let image: GrayImage = image
+        let img_buf = image
             .crop_imm((w - size) / 2, (h - size) / 2, size, size)
             .resize(img_size, img_size, image::imageops::FilterType::Lanczos3)
             .grayscale()
-            .into();
-        Canvas(
-            image::ImageBuffer::from_vec(
-                img_size,
-                img_size,
-                image
-                    .pixels()
-                    .map(|pixel| pixel[0] as f32 / std::u16::MAX as f32)
-                    .collect(),
-            )
-            .unwrap(),
-        )
+            .to_luma32f();
+        Self {
+            buf: img_buf,
+            ori_size: img_size,
+        }
     }
-    pub fn to_image(&self) -> GrayImage {
-        GrayImage::from_vec(
-            self.0.width(),
-            self.0.height(),
-            self.0
-                .pixels()
-                .map(|pixel| (pixel[0] * std::u16::MAX as f32) as _)
-                .collect(),
-        )
-        .unwrap()
+    pub fn invert(&mut self) {
+        for pixel in self.buf.pixels_mut() {
+            pixel.0[0] = 1.0 - pixel.0[0];
+        }
     }
-    pub fn get_pixel(&self, coord: Coord) -> f32 {
-        self.0.get_pixel(coord.x as _, coord.y as _)[0]
+    pub fn get_pixel(&self, coord: glam::Vec2) -> f32 {
+        self.buf.get_pixel(coord.x as _, coord.y as _)[0]
     }
-    pub fn get_pixel_mut(&mut self, coord: Coord) -> &mut f32 {
-        &mut self.0.get_pixel_mut(coord.x as _, coord.y as _)[0]
+    pub fn get_pixel_mut(&mut self, coord: glam::Vec2) -> &mut f32 {
+        &mut self.buf.get_pixel_mut(coord.x as _, coord.y as _)[0]
     }
-    pub fn overlay(&mut self, other: &Canvas) {
-        self.0
-            .pixels_mut()
-            .zip(other.0.pixels())
-            .for_each(|(s, e)| s[0] += e[0]);
+    pub fn line_space_coord(&self, start: Vec2, end: Vec2) -> Vec<Vec2> {
+        let step = (end - start).normalize();
+        let steps = ((end - start).length() / step.length()).ceil() as u32;
+        (0..steps).map(|i| start + step * i as f32).collect()
     }
 }
