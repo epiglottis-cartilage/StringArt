@@ -4,7 +4,6 @@ use image::GenericImageView;
 #[derive(Debug, Clone)]
 pub struct Canvas {
     buf: image::ImageBuffer<image::Luma<f32>, Vec<f32>>,
-    ori_size: u32,
 }
 impl Into<image::DynamicImage> for Canvas {
     fn into(self) -> image::DynamicImage {
@@ -14,10 +13,7 @@ impl Into<image::DynamicImage> for Canvas {
 impl Canvas {
     pub fn new(img_size: u32, fill: f32) -> Self {
         let img_buf = image::ImageBuffer::from_fn(img_size, img_size, |_, _| image::Luma([fill]));
-        Self {
-            buf: img_buf,
-            ori_size: img_size,
-        }
+        Self { buf: img_buf }
     }
     pub fn from(image: &image::DynamicImage, img_size: u32) -> Self {
         let (w, h) = image.dimensions();
@@ -27,10 +23,7 @@ impl Canvas {
             .resize(img_size, img_size, image::imageops::FilterType::Lanczos3)
             .grayscale()
             .to_luma32f();
-        Self {
-            buf: img_buf,
-            ori_size: img_size,
-        }
+        Self { buf: img_buf }
     }
     pub fn invert(&mut self) {
         for pixel in self.buf.pixels_mut() {
