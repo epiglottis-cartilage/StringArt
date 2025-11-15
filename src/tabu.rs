@@ -3,6 +3,7 @@ use crate::canvas::Canvas;
 use glam::Vec2;
 use rayon::prelude::*;
 
+#[allow(dead_code)]
 pub fn calculate_lines(
     source_image: &Canvas,
     line_cache: &Vec<Vec<Vec<Vec2>>>,
@@ -54,7 +55,7 @@ pub fn calculate_lines(
         current_pin = next_ping;
 
         line.iter().for_each(|point| {
-            *error.get_pixel_mut(*point) -= args.weight;
+            *error.get_pixel_mut(*point) -= args.line_weight;
         })
     }
 
