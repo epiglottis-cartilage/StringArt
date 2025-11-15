@@ -1,26 +1,59 @@
 use crate::Args;
 use crate::canvas::Canvas;
 use glam::Vec2;
+use rand::prelude::*;
 use rayon::prelude::*;
+#[derive(Debug, Clone)]
+pub struct Config {
+    /// number of pins to draw.
+    /// number for no reason
+    pin: usize,
+    /// how many lines should calculate.
+    lines: usize,
+    /// weight of the lines.
+    pub line_weight: f32,
+    /// size of the image.
+    /// bigger means more accurate but slower.
+    pub _img_size: u32,
+    /// distance between two pins we choose.
+    pub distance: usize,
+    /// how long should we omit a pin after it is used.
+    pub tabu: usize,
+    pub start: usize,
+}
+impl Config {
+    pub fn rand_from(args: &Args) -> Self {
+        fn random_in(val: f64, percentage: f64) -> f64 {
+            let frac = random::<f64>() * (percentage * 2.) + (1. - percentage);
+            val as f64 * frac
+        }
+        Self {
+            pin: args.pin,
+            lines: args.lines,
+            line_weight: random_in(args.line_weight as _, 0.25) as _,
+            _img_size: random_in(args.img_size as _, 0.25) as _,
+            distance: random_in(args.distance as _, 0.5) as _,
+            tabu: random_in(args.tabu as _, 0.5) as _,
+            start: random::<usize>() % args.pin,
+        }
+    }
+}
 
 #[allow(dead_code)]
 pub fn calculate_lines(
     source_image: &Canvas,
     line_cache: &Vec<Vec<Vec<Vec2>>>,
-    args: &Args,
+    args: &Config,
 ) -> Vec<usize> {
     let mut error = source_image.clone();
     error.invert();
     let mut line_sequence = Vec::with_capacity(args.lines);
     let mut recent_pins = std::collections::VecDeque::with_capacity(args.tabu + 1);
 
-    let mut current_pin = 0;
-    line_sequence.push(0);
+    let mut current_pin = args.start;
+    line_sequence.push(args.start);
 
-    for i in 0..args.lines {
-        if i & 511 == 0 {
-            eprintln!("{i}/{}", args.lines);
-        }
+    for _i in 0..args.lines {
         let (_, next_ping, line) = (args.distance..args.pin - args.distance)
             .par_bridge()
             .filter_map(|offset| {
@@ -55,7 +88,8 @@ pub fn calculate_lines(
         current_pin = next_ping;
 
         line.iter().for_each(|point| {
-            *error.get_pixel_mut(*point) -= args.line_weight;
+            *error.get_pixel_mut(*point) =
+                (*error.get_pixel_mut(*point) - args.line_weight).max(0.);
         })
     }
 

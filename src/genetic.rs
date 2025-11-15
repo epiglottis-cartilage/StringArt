@@ -1,5 +1,5 @@
-use crate::Args;
 use crate::canvas::Canvas;
+use crate::{Args, tabu};
 use glam::Vec2;
 use rand::prelude::*;
 use rayon::prelude::*;
@@ -8,39 +8,29 @@ use rayon::prelude::*;
 pub fn calculate_lines(
     source_image: &Canvas,
     line_cache: &Vec<Vec<Vec<Vec2>>>,
-    base: Option<Vec<usize>>,
     args: &Args,
 ) -> Vec<usize> {
-    // 1. 初始化种群
-    let mut population = initialize_population(args);
-    if let Some(x) = base {
-        population.push(x);
-    }
+    let mut population = initialize_population(source_image, line_cache, args);
 
-    // 2. 遗传算法主循环
     for i in 0..args.generations {
         eprintln!("Generation {}/{}", i, args.generations);
 
-        // 计算种群适应度
         let fitness_scores: Vec<f32> = population
             .par_iter()
             .map(|chromosome| calculate_fitness(chromosome, source_image, line_cache, args))
             .collect();
 
-        // 选择下一代父代
         let mut new_population = Vec::with_capacity(args.population_size);
         for _ in 0..args.population_size {
             let parent1 = tournament_selection(&population, &fitness_scores, 3);
             let parent2 = tournament_selection(&population, &fitness_scores, 3);
 
-            // 交叉
             let child = if rand::random::<f32>() < args.crossover_rate {
                 crossover(parent1, parent2)
             } else {
                 parent1.clone()
             };
 
-            // 变异
             let child = if rand::random::<f32>() < args.mutation_rate {
                 mutate(&child, args)
             } else {
@@ -53,7 +43,6 @@ pub fn calculate_lines(
         population = new_population;
     }
 
-    // 3. 返回最优个体
     let best_idx = population
         .iter()
         .map(|c| calculate_fitness(c, source_image, line_cache, args))
@@ -64,19 +53,16 @@ pub fn calculate_lines(
     population.remove(best_idx)
 }
 
-fn initialize_population(args: &Args) -> Vec<Vec<usize>> {
+fn initialize_population(
+    source_image: &Canvas,
+    line_cache: &Vec<Vec<Vec<Vec2>>>,
+    args: &Args,
+) -> Vec<Vec<usize>> {
     let mut population = Vec::with_capacity(args.population_size);
-    for _ in 0..args.population_size {
-        let mut chromosome = vec![0; args.lines + 1]; // 线条数+1个引脚（首尾衔接）
-        let mut current_pin = 0;
-        for i in 1..=args.lines {
-            // 随机选择符合间距限制的下一个引脚（同原逻辑）
-            let offset = (args.distance..args.pin - args.distance)
-                .choose(&mut rand::thread_rng())
-                .unwrap();
-            current_pin = (current_pin + offset) % args.pin;
-            chromosome[i] = current_pin;
-        }
+    for i in 0..args.population_size {
+        eprintln!("Initializing chromosome {}/{}", i, args.population_size);
+        let chromosome =
+            tabu::calculate_lines(source_image, line_cache, &tabu::Config::rand_from(args));
         population.push(chromosome);
     }
     population
@@ -87,15 +73,15 @@ fn calculate_fitness(
     line_cache: &[Vec<Vec<Vec2>>],
     args: &Args,
 ) -> f32 {
-    // 计算线条序列的误差（与目标图像的差异）
     let mut error = source_image.clone();
-    error.invert(); // 同原逻辑：误差初始为目标图像的反相
+    error.invert();
 
     for window in chromosome.windows(2) {
         let (s, e) = (window[0], window[1]);
         let (s, e) = if s < e { (s, e) } else { (e, s) };
         for point in &line_cache[s][e] {
-            *error.get_pixel_mut(*point) -= args.line_weight;
+            *error.get_pixel_mut(*point) =
+                (*error.get_pixel_mut(*point) - args.line_weight).max(0.);
         }
     }
 
@@ -122,7 +108,6 @@ fn crossover(parent1: &[usize], parent2: &[usize]) -> Vec<usize> {
     let (p1, p2) = (rand::random::<usize>() % len, rand::random::<usize>() % len);
     let (start, end) = (p1.min(p2), p1.max(p2));
 
-    // 复制父代1的[start, end)片段，其余复制父代2
     for i in 0..len {
         child[i] = if i >= start && i < end {
             parent1[i]
@@ -134,12 +119,14 @@ fn crossover(parent1: &[usize], parent2: &[usize]) -> Vec<usize> {
 }
 fn mutate(chromosome: &[usize], args: &Args) -> Vec<usize> {
     let mut mutated = chromosome.to_vec();
-    let pos = rand::random::<usize>() % (chromosome.len() - 1); // 避免最后一个位置（无后续）
-    let current = chromosome[pos];
+    let pos = rand::random::<usize>() % (chromosome.len() - 1);
     // 随机选择符合间距限制的新引脚
-    let offset = (args.distance..args.pin - args.distance)
-        .choose(&mut rand::thread_rng())
-        .unwrap();
-    mutated[pos + 1] = (current + offset) % args.pin;
+    // let current = chromosome[pos];
+    // let offset = (args.distance..args.pin - args.distance)
+    //     .choose(&mut rand::thread_rng())
+    //     .unwrap();
+    // mutated[pos + 1] = (current + offset) % args.pin;
+
+    mutated[pos + 1] = random::<usize>() % args.pin;
     mutated
 }

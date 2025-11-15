@@ -44,15 +44,13 @@ pub struct Args {
     #[clap(long, default_value_t = 0.1)]
     mutation_rate: f32,
     /// number of generations iterate
-    #[clap(long, default_value_t = 200)]
+    #[clap(long, default_value_t = 100)]
     generations: usize,
 
     /// output file name
     #[clap(short, long, default_value = "output.png")]
     output: std::path::PathBuf,
 }
-
-
 
 fn main() {
     let args = Args::parse();
@@ -65,9 +63,7 @@ fn main() {
     let pin_coords = utils::calculate_pin_coords(&args);
     let line_cache = utils::precalculate_all_potential_lines(&raw_image, &pin_coords, &args);
 
-    let line_sequence = tabu::calculate_lines(&raw_image, &line_cache, &args);
-    // let line_sequence =
-    //     genetic::calculate_lines(&raw_image, &line_cache, Some(line_sequence), &args);
+    let line_sequence = genetic::calculate_lines(&raw_image, &line_cache, &args);
 
     println!("{:?}", line_sequence);
     let final_image: image::DynamicImage =
