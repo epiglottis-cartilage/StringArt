@@ -9,6 +9,7 @@ dependencies = [
  "clap",
  "glam",
  "image",
+ "rand",
  "rayon",
 ]
 

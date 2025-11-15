@@ -11,3 +11,4 @@ image = "*"
 clap = { version = "*", features = ["derive"] }
 glam = "*"
 rayon = "*"
+rand = "*"

@@ -3,7 +3,7 @@ use image::GenericImageView;
 
 #[derive(Debug, Clone)]
 pub struct Canvas {
-    buf: image::ImageBuffer<image::Luma<f32>, Vec<f32>>,
+    pub buf: image::ImageBuffer<image::Luma<f32>, Vec<f32>>,
 }
 impl Into<image::DynamicImage> for Canvas {
     fn into(self) -> image::DynamicImage {
@@ -40,5 +40,12 @@ impl Canvas {
         let step = (end - start).normalize();
         let steps = ((end - start).length() / step.length()).ceil() as u32;
         (0..steps).map(|i| start + step * i as f32).collect()
+    }
+    pub fn cmp(&self, other: &Canvas) -> f32 {
+        self.buf
+            .pixels()
+            .zip(other.buf.pixels())
+            .map(|(p1, p2)| (p1.0[0] - p2.0[0]).abs())
+            .sum()
     }
 }
