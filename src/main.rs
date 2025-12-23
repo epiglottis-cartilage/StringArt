@@ -1,6 +1,7 @@
 mod canvas;
 use canvas::Canvas;
 mod genetic;
+mod svg;
 mod tabu;
 
 use clap::Parser;
@@ -48,7 +49,7 @@ struct Args {
     generations: usize,
 
     /// output file name
-    #[clap(short, long, default_value = "output.png")]
+    #[clap(short, long, default_value = "output.svg")]
     output: std::path::PathBuf,
 }
 
@@ -66,13 +67,22 @@ fn main() {
     let line_sequence = genetic::calculate_lines(&raw_image, &line_cache, &args);
 
     println!("{:?}", line_sequence);
-    let final_image: image::DynamicImage =
-        utils::draw_lines(&line_sequence, &line_cache, &args).into();
+    // let final_image: image::DynamicImage =
+    //     utils::draw_lines(&line_sequence, &line_cache, &args).into();
 
-    final_image
-        .to_luma8()
-        .save(args.output)
-        .expect("Failed to save the file");
+    // final_image
+    //     .to_luma8()
+    //     .save(args.output)
+    //     .expect("Failed to save the file");
+
+    svg::save_as_svg(
+        &line_sequence,
+        args.pin,              // 针的数量
+        args.img_size,         // 图像尺寸
+        &args.output,          // 输出路径
+        args.line_weight * 2., // 线条宽度
+    )
+    .expect("Failed to save SVG");
 }
 
 mod utils {
@@ -113,20 +123,5 @@ mod utils {
                     .collect()
             })
             .collect()
-    }
-    pub fn draw_lines(
-        line_sequence: &[usize],
-        line_cache: &Vec<Vec<Vec<Vec2>>>,
-        args: &Args,
-    ) -> Canvas {
-        let mut canvas = Canvas::new(args.img_size, 1.0);
-        line_sequence.windows(2).for_each(|l| {
-            let [s, e] = *l else { unreachable!() };
-            let (s, e) = if s < e { (s, e) } else { (e, s) };
-            line_cache[s][e].iter().for_each(|point| {
-                *canvas.get_pixel_mut(*point) -= args.line_weight;
-            })
-        });
-        canvas
     }
 }

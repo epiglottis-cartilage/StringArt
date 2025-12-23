@@ -1,7 +1,6 @@
 use crate::canvas::Canvas;
 use crate::{Args, tabu};
 use glam::Vec2;
-use rand::prelude::*;
 use rayon::prelude::*;
 
 #[allow(dead_code)]
@@ -90,7 +89,7 @@ fn calculate_fitness(
     error.invert();
 
     for window in chromosome.windows(2) {
-        let (s, e) = (window[0], window[1]);
+        let [s, e] = *window else { unreachable!() };
         let (s, e) = if s < e { (s, e) } else { (e, s) };
         for point in &line_cache[s][e] {
             *error.get_pixel_mut(*point) =

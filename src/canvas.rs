@@ -11,6 +11,7 @@ impl Into<image::DynamicImage> for Canvas {
     }
 }
 impl Canvas {
+    #[allow(dead_code)]
     pub fn new(img_size: u32, fill: f32) -> Self {
         let img_buf = image::ImageBuffer::from_fn(img_size, img_size, |_, _| image::Luma([fill]));
         Self { buf: img_buf }
@@ -40,12 +41,5 @@ impl Canvas {
         let step = (end - start).normalize();
         let steps = ((end - start).length() / step.length()).ceil() as u32;
         (0..steps).map(|i| start + step * i as f32).collect()
-    }
-    pub fn cmp(&self, other: &Canvas) -> f32 {
-        self.buf
-            .pixels()
-            .zip(other.buf.pixels())
-            .map(|(p1, p2)| (p1.0[0] - p2.0[0]).abs())
-            .sum()
     }
 }

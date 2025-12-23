@@ -1,7 +1,6 @@
 use crate::Args;
 use crate::canvas::Canvas;
 use glam::Vec2;
-use rand::prelude::*;
 use rayon::prelude::*;
 #[derive(Debug, Clone)]
 pub struct Config {
