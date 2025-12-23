@@ -1,5 +1,5 @@
 mod canvas;
-pub use canvas::Canvas;
+use canvas::Canvas;
 mod genetic;
 mod tabu;
 
@@ -7,7 +7,7 @@ use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[clap(version)]
-pub struct Args {
+struct Args {
     /// path to the image file.
     #[clap()]
     file: std::path::PathBuf,
@@ -75,7 +75,7 @@ fn main() {
         .expect("Failed to save the file");
 }
 
-pub mod utils {
+mod utils {
     use crate::{Args, Canvas};
     use glam::Vec2;
     use rayon::prelude::*;

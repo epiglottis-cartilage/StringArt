@@ -24,7 +24,7 @@ pub struct Config {
 impl Config {
     pub fn rand_from(args: &Args) -> Self {
         fn random_in(val: f64, percentage: f64) -> f64 {
-            let frac = random::<f64>() * (percentage * 2.) + (1. - percentage);
+            let frac = rand::random::<f64>() * (percentage * 2.) + (1. - percentage);
             val as f64 * frac
         }
         Self {
@@ -34,7 +34,7 @@ impl Config {
             _img_size: random_in(args.img_size as _, 0.25) as _,
             distance: random_in(args.distance as _, 0.5) as _,
             tabu: random_in(args.tabu as _, 0.5) as _,
-            start: random::<usize>() % args.pin,
+            start: rand::random::<u32>() as usize % args.pin,
         }
     }
 }

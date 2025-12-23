@@ -12,13 +12,27 @@ pub fn calculate_lines(
 ) -> Vec<usize> {
     let mut population = initialize_population(source_image, line_cache, args);
 
-    for i in 0..args.generations {
-        eprintln!("Generation {}/{}", i, args.generations);
+    let mut fitness_scores: Vec<f32> = if args.generations == 0 {
+        population
+            .par_iter()
+            .map(|chromosome| calculate_fitness(chromosome, source_image, line_cache, args))
+            .collect()
+    } else {
+        Vec::new()
+    };
 
-        let fitness_scores: Vec<f32> = population
+    for i in 0..args.generations {
+        fitness_scores = population
             .par_iter()
             .map(|chromosome| calculate_fitness(chromosome, source_image, line_cache, args))
             .collect();
+
+        eprintln!(
+            "Generation {}/{}\tbest:{}",
+            i,
+            args.generations,
+            fitness_scores.iter().max_by(|a, b| a.total_cmp(b)).unwrap()
+        );
 
         let mut new_population = Vec::with_capacity(args.population_size);
         for _ in 0..args.population_size {
@@ -43,9 +57,8 @@ pub fn calculate_lines(
         population = new_population;
     }
 
-    let best_idx = population
-        .iter()
-        .map(|c| calculate_fitness(c, source_image, line_cache, args))
+    let best_idx = fitness_scores
+        .into_iter()
         .enumerate()
         .max_by(|(_, f1), (_, f2)| f1.total_cmp(f2))
         .map(|(i, _)| i)
@@ -93,9 +106,9 @@ fn tournament_selection<'a>(
     fitness: &[f32],
     k: usize,
 ) -> &'a Vec<usize> {
-    let mut best_idx = rand::random::<usize>() % population.len();
+    let mut best_idx = rand::random::<u32>() as usize % population.len();
     for _ in 1..k {
-        let idx = rand::random::<usize>() % population.len();
+        let idx = rand::random::<u32>() as usize % population.len();
         if fitness[idx] > fitness[best_idx] {
             best_idx = idx;
         }
@@ -105,7 +118,10 @@ fn tournament_selection<'a>(
 fn crossover(parent1: &[usize], parent2: &[usize]) -> Vec<usize> {
     let len = parent1.len();
     let mut child = vec![0; len];
-    let (p1, p2) = (rand::random::<usize>() % len, rand::random::<usize>() % len);
+    let (p1, p2) = (
+        rand::random::<u32>() as usize % len,
+        rand::random::<u32>() as usize % len,
+    );
     let (start, end) = (p1.min(p2), p1.max(p2));
 
     for i in 0..len {
@@ -119,7 +135,7 @@ fn crossover(parent1: &[usize], parent2: &[usize]) -> Vec<usize> {
 }
 fn mutate(chromosome: &[usize], args: &Args) -> Vec<usize> {
     let mut mutated = chromosome.to_vec();
-    let pos = rand::random::<usize>() % (chromosome.len() - 1);
+    let pos = rand::random::<u32>() as usize % (chromosome.len() - 1);
     // 随机选择符合间距限制的新引脚
     // let current = chromosome[pos];
     // let offset = (args.distance..args.pin - args.distance)
@@ -127,6 +143,6 @@ fn mutate(chromosome: &[usize], args: &Args) -> Vec<usize> {
     //     .unwrap();
     // mutated[pos + 1] = (current + offset) % args.pin;
 
-    mutated[pos + 1] = random::<usize>() % args.pin;
+    mutated[pos + 1] = rand::random::<u32>() as usize % args.pin;
     mutated
 }
