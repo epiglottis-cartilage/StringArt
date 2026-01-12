@@ -4,7 +4,7 @@ use std::path::Path;
 
 fn calculate_pin_positions(pin_count: usize, size: u32, margin: f32) -> Vec<Vec2> {
     let center = Vec2::new(size as f32 / 2.0, size as f32 / 2.0);
-    let radius = (size as f32 - 2.0 * margin) / 2.0; // 半径减去留白
+    let radius = (size as f32 - 2.0 * margin) / 2.0;
 
     (0..pin_count)
         .map(|i| {
@@ -30,7 +30,6 @@ fn generate_svg(
         size, size
     );
 
-    // 绘制线条（连接序列中连续的针）
     for i in 0..line_sequence.len() - 1 {
         let start = line_sequence[i];
         let end = line_sequence[i + 1];
@@ -55,10 +54,7 @@ pub fn save_as_svg(
     output_path: &Path,
     line_width: f32,
 ) -> Result<(), std::io::Error> {
-    // 计算针的坐标（留白 10 像素）
     let pin_positions = calculate_pin_positions(pin_count, size, 10.0);
-    // 生成SVG内容
     let svg_content = generate_svg(line_sequence, &pin_positions, size, "#000000", line_width);
-    // 写入文件
     write(output_path, svg_content)
 }

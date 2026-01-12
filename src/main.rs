@@ -77,10 +77,10 @@ fn main() {
 
     svg::save_as_svg(
         &line_sequence,
-        args.pin,              // 针的数量
-        args.img_size,         // 图像尺寸
-        &args.output,          // 输出路径
-        args.line_weight * 2., // 线条宽度
+        args.pin,
+        args.img_size,
+        &args.output,
+        args.line_weight * 2.,
     )
     .expect("Failed to save SVG");
 }
